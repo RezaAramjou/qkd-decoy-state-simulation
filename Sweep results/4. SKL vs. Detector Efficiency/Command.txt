@@ -1,0 +1,1 @@
+python run_analysis.py --config-file params.json sweep --numeric det_eff 0.2 1.0 20 --seeds 50 --output-plot blinding_attack_sweep.png

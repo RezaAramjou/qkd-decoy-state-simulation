@@ -1,0 +1,1 @@
+python run_analysis.py --config-file params.json sensitivity --scenarios-file scenarios.json --seeds 100

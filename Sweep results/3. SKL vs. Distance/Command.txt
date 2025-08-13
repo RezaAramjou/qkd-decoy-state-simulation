@@ -1,0 +1,1 @@
+python run_analysis.py --config-file params.json sweep --numeric distance_km 10 80 15 --seeds 20 --output-plot distance_sweep.png --output-json distance_sweep.json

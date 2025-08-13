@@ -1,0 +1,1 @@
+python run_analysis.py --config-file params.json sweep --numeric num_bits 1e8 1e9 15 --seeds 20 --output-plot block_size_sweep_short.png --parallel sweep_point --max-workers 6
