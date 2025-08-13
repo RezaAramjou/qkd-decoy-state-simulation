@@ -40,13 +40,13 @@ To counter the PNS attack, Alice randomly varies the intensity (mean photon numb
 ## Project Structure
 
 The repository is organized into distinct modules that reflect the different stages of QKD security analysis.²
-
+```
 ├── 1.Initial codes/      # Simulation for the asymptotic (infinite-key) regime.
 ├── 2.Finite key/         # Simulation including finite-key effects for practical security.
 ├── Sweep results/        # Directory for storing output data and plots from simulations.
 ├── requirements.in       # Project dependencies.
 └── requirements.txt      # Pinned versions of all dependencies.
-
+```
 
 ---
 
