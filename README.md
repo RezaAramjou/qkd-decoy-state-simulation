@@ -40,3 +40,98 @@ To counter the PNS attack, Alice randomly varies the intensity (mean photon numb
 ## Project Structure
 
 The repository is organized into distinct modules that reflect the different stages of QKD security analysis.²
+
+├── 1.Initial codes/      # Simulation for the asymptotic (infinite-key) regime.
+├── 2.Finite key/         # Simulation including finite-key effects for practical security.
+├── Sweep results/        # Directory for storing output data and plots from simulations.
+├── requirements.in       # Project dependencies.
+└── requirements.txt      # Pinned versions of all dependencies.
+
+
+---
+
+## Installation
+
+1.  Clone the repository to your local machine:
+    ```bash
+    git clone [https://github.com/RezaAramjou/qkd-decoy-state-simulation.git](https://github.com/RezaAramjou/qkd-decoy-state-simulation.git)
+    cd qkd-decoy-state-simulation
+    ```
+2.  It is highly recommended to create and activate a Python virtual environment:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    ```
+3.  Install the required dependencies from the `requirements.txt` file:²
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+---
+
+## Usage (Inferred)
+
+*This guide is inferred from the project's structure, as detailed documentation is not yet available.*
+
+1.  **Navigate to the desired analysis directory.**
+2.  **Configure Parameters**: Open the main Python script (e.g., `main.py` or `simulation.py`). Manually edit the physical and protocol parameters defined within the script, such as:
+    * Channel length (distance in km)
+    * Fiber attenuation (dB/km)
+    * Detector efficiency and dark count rate
+    * Optical system misalignment error (`e_d`)
+    * Mean photon numbers for signal (`mu`) and decoy (`nu`) states
+    * Total number of pulses to simulate (especially for finite-key analysis)
+3.  **Run the Simulation**:
+    * To run the **asymptotic analysis**:
+        ```bash
+        cd "1.Initial codes"
+        python main.py  # Or the relevant script name
+        ```
+    * To run the **finite-key analysis**:
+        ```bash
+        cd "2.Finite key"
+        python main.py  # Or the relevant script name
+        ```
+4.  **View Results**: The simulation will likely generate output data files (e.g., `.csv`) and plots (e.g., `.png`) in the `Sweep results/` directory. These may include plots of Secure Key Rate vs. Distance.
+
+---
+
+## Core Formula: Secure Key Rate
+
+The ultimate goal of the simulation is to compute the Secure Key Rate ($R$). In the asymptotic limit, this is often calculated using a formula derived from the GLLP security proof.⁸
+
+$R \ge q \{ Y_1^L [1 - H_2(e_1^U)] - Q_\mu f(E_\mu) H_2(E_\mu) \}$
+
+Where:
+
+* **$q$**: The sifting factor, which accounts for basis mismatch (typically 1/2 for BB84).
+* **$Y_1^L$**: The lower bound on the yield of single-photon pulses (estimated using decoy states).
+* **$e_1^U$**: The upper bound on the error rate of single-photon pulses (estimated using decoy states).
+* **$Q_\mu$**: The overall gain (detection rate) of the signal state (a measured observable).
+* **$E_\mu$**: The overall QBER of the signal state (a measured observable).
+* **$H_2(x)$**: The binary Shannon entropy function: $H_2(x) = -x \log_2(x) - (1-x) \log_2(1-x)$.
+* **$f(E_\mu)$**: The inefficiency of the classical error correction protocol (a factor $\ge 1$).
+
+The finite-key analysis uses a more complex version of this formula that includes additional penalty terms for the finite size of the transmitted data.
+
+---
+
+## Contributing
+
+Contributions to improve this project are welcome. Key areas for development include:
+* **Documentation**: Enhancing this README, adding a user guide, and providing extensive inline code comments.
+* **Usability**: Implementing a command-line interface (CLI) or configuration files to manage parameters.
+* **Verification**: Developing a test suite to verify the simulation's output against results from seminal papers in the field.
+* **Feature Expansion**:
+    * Modeling other QKD protocols (e.g., MDI-QKD).
+    * Simulating more advanced eavesdropping attacks or channel imperfections.
+
+---
+
+## Citation
+
+This project appears to be associated with the thesis research described in:
+
+*A Study of the Quantum Key Distribution Decoy State Protocol Using Model Based Systems Engineering Processes, Methods, and Tools* ¹
+
+If you use this code in your research, please consider citing the repository.
