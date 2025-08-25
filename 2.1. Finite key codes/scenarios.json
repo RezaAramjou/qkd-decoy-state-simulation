@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Numeric Sensitivity: +0.1% Dark Rate",
+    "param_path": "dark_rate",
+    "value": 1.001e-7
+  },
+  {
+    "name": "Numeric Sensitivity: -0.1% Dark Rate",
+    "param_path": "dark_rate",
+    "value": 0.999e-7
+  },
+  {
+    "name": "Numeric Sensitivity: +0.1% Detector Eff.",
+    "param_path": "det_eff",
+    "value": 0.2002
+  },
+  {
+    "name": "Numeric Sensitivity: -0.1% Detector Eff.",
+    "param_path": "det_eff",
+    "value": 0.1998
+  },s
+  {
+    "name": "Attack Scenario: High Dark Counts",
+    "param_path": "dark_rate",
+    "value": 5e-6
+  },
+  {
+    "name": "Attack Scenario: Detector Blinding",
+    "param_path": "det_eff",
+    "value": 0.95
+  },
+  {
+    "name": "Imperfection: Increased Misalignment",
+    "param_path": "misalignment",
+    "value": 0.05
+  },
+  {
+    "name": "Imperfection: Poor Error Correction",
+    "param_path": "f_error_correction",
+    "value": 1.25
+  },
+  {
+    "name": "Attack Scenario: Decoy State Manipulation",
+    "param_path": "pulse_configs[1].mean_photon_number",
+    "value": 0.2
+  }
+]

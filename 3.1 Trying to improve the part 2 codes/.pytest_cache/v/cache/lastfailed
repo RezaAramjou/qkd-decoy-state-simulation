@@ -1,0 +1,15 @@
+{
+  "test_unit_qkd.py::TestParameterValidation::test_invalid_params_raise_error[dark_rate-1.1-dark_rate must be in [0, 1)]": true,
+  "test_unit_qkd.py::TestParameterValidation::test_invalid_params_raise_error[f_error_correction-0.9-f_error_correction must be in [1.0, 5.0]]": true,
+  "test_unit_qkd.py::TestParameterValidation::test_invalid_params_raise_error[alice_z_basis_prob-1.1-alice_z_basis_prob must be in [0,1]]": true,
+  "test_unit_qkd.py::TestStatisticalHelpers::test_clopper_pearson_bounds[0-100-1e-06-0.0-0.1274]": true,
+  "test_unit_qkd.py::TestStatisticalHelpers::test_clopper_pearson_bounds[100-100-1e-06-0.8673-1.0]": true,
+  "test_unit_qkd.py::TestStatisticalHelpers::test_clopper_pearson_bounds[50-100-0.05-0.3994-0.6005]": true,
+  "test_unit_qkd.py::TestStatisticalHelpers::test_binary_entropy[0.11-0.499593]": true,
+  "test_unit_qkd.py::TestStatisticalHelpers::test_binary_entropy[0.11-0.500111]": true,
+  "test_unit_qkd.py::TestStatisticalHelpers::test_binary_entropy[0.11-0.500111048]": true,
+  "test_unit_qkd.py::TestSiftingLogic::test_misalignment_is_deterministic_with_seeded_rng": true,
+  "test_lp.py": true,
+  "unit/test_lp.py": true,
+  "tests/unit/test_serialization.py::TestSerializationAndHelpers::test_from_dict_with_unknown_key_in_pulse_config_raises": true
+}

@@ -1,0 +1,315 @@
+# -*- coding: utf-8 -*-
+"""
+High-level simulation orchestration for Quantum Key Distribution (QKD) systems.
+
+This script orchestrates a full QKD simulation, including parallel batch
+processing using a robust, memory-safe streaming submission pattern. It is
+designed for reproducibility and resilience, with graceful shutdown mechanisms
+and detailed result validation. It is recommended to run with Python >= 3.9
+for the most robust process shutdown capabilities.
+"""
+
+# Standard library imports
+import datetime
+import gc
+import inspect
+import logging
+import multiprocessing
+import os
+import pickle
+import secrets
+import signal
+import sys
+import tempfile
+import time
+import traceback
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED, Future
+from concurrent.futures.process import BrokenProcessPool as BrokenProcessPoolError
+from typing import Dict, Optional, Any, Generator, Tuple, List, Type
+from multiprocessing.synchronize import Event as EventType
+
+# Third-party imports
+import numpy as np
+
+# A fallback for the tqdm progress bar if it's not installed.
+try:
+    from tqdm import tqdm
+    TqdmType = tqdm
+except ImportError:
+    class TqdmFallback:
+        def __init__(self, iterable=None, *args, **kwargs):
+            self.iterable = iterable
+            self.total = kwargs.get("total")
+            self.current = 0
+        def __iter__(self): return iter(self.iterable) if self.iterable else self
+        def __next__(self):
+            if self.iterable and self.current < len(self.iterable):
+                self.current += 1
+                return self.iterable[self.current - 1]
+            raise StopIteration
+        def __len__(self):
+            return self.total if self.total is not None else 0
+        def update(self, n=1): self.current += n
+        def close(self): pass
+        def __enter__(self): return self
+        def __exit__(self, exc_type, exc_val, exc_tb): self.close()
+    TqdmType = TqdmFallback # type: ignore
+
+# Local application/library specific imports
+from .params import QKDParams
+from .datatypes import SimulationResults, TallyCounts, SecurityCertificate, SecurityProof, ConfidenceBoundMethod, EpsilonAllocation
+from .exceptions import LPFailureError, ParameterValidationError, QKDSimulationError
+from .simulation_batch import _top_level_worker_function, _merge_batch_tallies
+from .constants import MAX_SEED_INT_PCG64 as MAX_SEED_INT
+from .proofs import Lim2014Proof, BB84TightProof, MDIQKDProof
+
+__all__ = ["QKDSystem"]
+
+logger = logging.getLogger(__name__)
+
+# --- Module-level constants and setup ---
+SIMULATION_VERSION = "v11.0-production-final"
+METADATA_SCHEMA_VERSION = "1.8"
+DEFAULT_PARAMS_PICKLE_THRESHOLD_BYTES = 1_000_000
+
+# Global event for signaling termination to worker processes.
+_qkd_terminate_event: Optional[EventType] = None
+
+def _worker_init(terminate_event: EventType) -> None:
+    """Initializer for worker processes to tune environment and handle signals."""
+    global _qkd_terminate_event
+    _qkd_terminate_event = terminate_event
+    if hasattr(signal, 'SIGINT'):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+    os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+
+class QKDSystem:
+    """
+    Orchestrates a full QKD simulation, including parallel batch processing
+    and post-processing analysis.
+    """
+
+    def __init__(self, params: QKDParams, seed: Optional[int] = None, save_master_seed: bool = False):
+        """Initializes the QKD system with a given set of parameters."""
+        self.p = params
+        self.save_master_seed = save_master_seed
+
+        if not isinstance(MAX_SEED_INT, int) or MAX_SEED_INT < 2:
+            raise ParameterValidationError(f"MAX_SEED_INT must be an integer >= 2, but got {MAX_SEED_INT}")
+
+        if seed is not None:
+            self.master_seed_int = int(seed)
+        else:
+            self.master_seed_int = secrets.randbelow(MAX_SEED_INT) + 1
+
+        self.rng = np.random.default_rng(self.master_seed_int)
+
+        proof_map: Dict[SecurityProof, Type[Any]] = {
+            SecurityProof.LIM_2014: Lim2014Proof,
+            SecurityProof.TIGHT_PROOF: BB84TightProof,
+            SecurityProof.MDI_QKD: MDIQKDProof,
+        }
+        proof_class = proof_map.get(self.p.security_proof)
+        if proof_class:
+            self.proof_module = proof_class(self.p)
+        else:
+            raise NotImplementedError(f"Security proof {self.p.security_proof.value} not implemented.")
+        self._worker_function = _top_level_worker_function
+
+    def __repr__(self) -> str:
+        """Provide a safer, more concise representation."""
+        params_repr = f"QKDParams(type={type(self.p).__name__})"
+        seed_repr = "REDACTED" if not self.save_master_seed else self.master_seed_int
+        return f"QKDSystem(params={params_repr}, master_seed={seed_repr})"
+
+    def _prepare_task_params(self) -> dict:
+        """Prepares the parameters for worker tasks, using a temp file for large objects."""
+        params_dict = self.p.to_serializable_dict()
+        pickle_threshold = getattr(self.p, 'params_pickle_threshold_bytes', DEFAULT_PARAMS_PICKLE_THRESHOLD_BYTES)
+        
+        try:
+            pickled_params = pickle.dumps(params_dict, protocol=pickle.HIGHEST_PROTOCOL)
+            if len(pickled_params) > pickle_threshold:
+                logger.info(f"Serialized params are large ({len(pickled_params)} bytes), using temp file transport.")
+                with tempfile.NamedTemporaryFile(delete=False, mode='wb', suffix=".pkl") as tmp:
+                    tmp.write(pickled_params)
+                    return {"params_file": tmp.name, "delete_file": True}
+        except (pickle.PicklingError, TypeError) as e:
+            raise ParameterValidationError("Parameters cannot be pickled for worker processes.") from e
+
+        return params_dict
+
+    def _generate_tasks(self, num_batches: int, child_seeds: List[int], task_params: dict) -> Generator[Tuple[Dict, int, int], None, None]:
+        """A generator that yields simulation tasks."""
+        total_pulses, batch_size = self.p.num_bits, self.p.batch_size
+        for i in range(num_batches):
+            pulses_in_batch = min(batch_size, total_pulses - i * batch_size)
+            yield (task_params, pulses_in_batch, child_seeds[i])
+
+    def run_simulation(self) -> SimulationResults:
+        """Executes the entire simulation."""
+        start_time: float = time.monotonic()
+        timing_meta: Dict[str, Any] = {"start_utc_iso": datetime.datetime.utcnow().isoformat() + "Z", "start_monotonic": start_time}
+        
+        total_pulses, batch_size = self.p.num_bits, self.p.batch_size
+        num_batches = (total_pulses + batch_size - 1) // batch_size
+        
+        child_seeds_np = self.rng.choice(MAX_SEED_INT, size=num_batches, replace=False) + 1
+        child_seeds: List[int] = child_seeds_np.tolist()
+
+        overall_stats: Dict[str, TallyCounts] = {pc.name: TallyCounts() for pc in self.p.source.pulse_configs}
+        total_sifted: int = 0
+        status_info: Dict[str, str] = {"code": "OK", "message": "Simulation completed successfully."}
+        
+        metadata: Dict[str, Any] = {
+            "version": SIMULATION_VERSION, "schema_version": METADATA_SCHEMA_VERSION,
+            "timing": timing_meta, "failures": {}, "run_id": getattr(self.p, 'run_id', 'N/A'),
+            "batches_completed": 0, "num_batches": num_batches
+        }
+        if self.save_master_seed:
+            metadata["master_seed"] = self.master_seed_int
+
+        task_params = self._prepare_task_params()
+        
+        use_mp = self.p.num_workers > 1 and num_batches > 1 and not self.p.force_sequential
+        if use_mp:
+            total_sifted, overall_stats, status_info, metadata = self._run_multiprocessed(
+                num_batches, child_seeds, task_params, overall_stats, metadata
+            )
+        else:
+            total_sifted, overall_stats, status_info, metadata = self._run_sequential(
+                num_batches, child_seeds, task_params, overall_stats, metadata
+            )
+
+        end_time = time.monotonic()
+        timing_meta["end_monotonic"] = end_time
+        timing_meta["simulation_seconds"] = end_time - start_time
+        
+        if status_info["code"] != "OK":
+            return SimulationResults(params=self.p, metadata=metadata, status=status_info["code"], simulation_time_seconds=float(timing_meta["simulation_seconds"]))
+
+        return self._post_process(overall_stats, total_sifted, metadata, status_info)
+
+    def _run_multiprocessed(
+        self, num_batches: int, child_seeds: List[int], task_params: dict, overall_stats: Dict[str, TallyCounts], metadata: Dict[str, Any]
+    ) -> Tuple[int, Dict[str, TallyCounts], Dict[str, str], Dict[str, Any]]:
+        """Handles the multiprocessing execution logic."""
+        num_workers = self.p.num_workers
+        status_info: Dict[str, str] = {"code": "OK", "message": "Simulation completed successfully."}
+        total_sifted = 0
+        
+        mp_context = multiprocessing.get_context("spawn")
+        terminate_event = mp_context.Event()
+        
+        with ProcessPoolExecutor(max_workers=num_workers, mp_context=mp_context, initializer=_worker_init, initargs=(terminate_event,)) as executor:
+            tasks = self._generate_tasks(num_batches, child_seeds, task_params)
+            submitted: Dict[Future, Dict[str, Any]] = {
+                executor.submit(self._worker_function, *task_args): {"batch_idx": i}
+                for i, task_args in enumerate(tasks)
+            }
+
+            with TqdmType(total=num_batches, desc="Simulating Batches (MP)") as pbar:
+                done, not_done = wait(submitted.keys(), return_when=FIRST_COMPLETED)
+                while done:
+                    for future in done:
+                        batch_idx = submitted[future]['batch_idx']
+                        try:
+                            batch_result = future.result()
+                            self._validate_and_merge_batch(batch_result, overall_stats, self.p.batch_size)
+                            total_sifted += batch_result.get("sifted_count", 0)
+                            metadata["batches_completed"] += 1
+                        except Exception as e:
+                            logger.error(f"Batch {batch_idx} failed: {e}", exc_info=True)
+                            status_info = {"code": "WORKER_ERROR", "message": f"Failure in batch {batch_idx}."}
+                            terminate_event.set()
+                            # Cancel remaining tasks
+                            for f in not_done:
+                                f.cancel()
+                            break  # Exit the inner loop
+                        pbar.update(1)
+                    
+                    if terminate_event.is_set():
+                        break # Exit the outer loop
+                    
+                    done, not_done = wait(not_done, return_when=FIRST_COMPLETED)
+
+        return total_sifted, overall_stats, status_info, metadata
+
+    def _run_sequential(
+        self, num_batches: int, child_seeds: List[int], task_params: dict, overall_stats: Dict[str, TallyCounts], metadata: Dict[str, Any]
+    ) -> Tuple[int, Dict[str, TallyCounts], Dict[str, str], Dict[str, Any]]:
+        """Handles the sequential execution logic."""
+        status_info: Dict[str, str] = {"code": "OK", "message": "Simulation completed successfully."}
+        total_sifted = 0
+        tasks_generator = self._generate_tasks(num_batches, child_seeds, task_params)
+        with TqdmType(tasks_generator, total=num_batches, desc="Simulating Batches (Seq)") as seq_pbar:
+            for i, task in enumerate(seq_pbar):
+                try:
+                    batch_result = self._worker_function(*task)
+                    self._validate_and_merge_batch(batch_result, overall_stats, task[1])
+                    total_sifted += int(batch_result.get("sifted_count", 0))
+                    metadata["batches_completed"] = i + 1
+                except Exception as e:
+                    logger.error(f"Sequential batch {i} (seed {task[2]}) failed.", exc_info=True)
+                    status_info = {"code": "WORKER_ERROR", "message": f"Failure in sequential batch {i}."}
+                    break
+        return total_sifted, overall_stats, status_info, metadata
+
+    def _post_process(
+        self, overall_stats: Dict[str, TallyCounts], total_sifted: int, metadata: Dict[str, Any], status_info: Dict[str, str]
+    ) -> SimulationResults:
+        """Handles security proof calculations and final result assembly."""
+        try:
+            if isinstance(self.proof_module, BB84TightProof):
+                key_len_res = self.proof_module.calculate_key_length({}, overall_stats)
+                decoy_est = {}
+            else:
+                decoy_est = self.proof_module.estimate_yields_and_errors(overall_stats)
+                if not decoy_est.get("ok"):
+                    status_info = {"code": "DECOY_ESTIMATION_FAILED", "message": decoy_est.get('status', 'Unknown')}
+                    return SimulationResults(params=self.p, metadata=metadata, status=status_info["code"], simulation_time_seconds=float(metadata["timing"]["simulation_seconds"]))
+                key_len_res = self.proof_module.calculate_key_length(decoy_est, overall_stats)
+            
+            # CORRECTED: Use getattr for safe attribute access on the result object.
+            secure_len = int(max(0, getattr(key_len_res, "key_length", 0)))
+
+            eps_alloc = getattr(self.proof_module, "eps_alloc", None)
+            if eps_alloc is None:
+                raise QKDSimulationError(f"Proof module {type(self.proof_module).__name__} is missing the 'eps_alloc' attribute required for the security certificate.")
+
+            cert = SecurityCertificate(
+                proof_name=self.p.security_proof,
+                confidence_bound_method=self.p.ci_method,
+                assumed_phase_equals_bit_error=self.p.assume_phase_equals_bit_error,
+                epsilon_allocation=eps_alloc,
+                lp_solver_diagnostics=decoy_est.get("lp_diagnostics"),
+            )
+            return SimulationResults(
+                params=self.p, metadata=metadata, security_certificate=cert,
+                decoy_estimates=decoy_est, secure_key_length=secure_len,
+                raw_sifted_key_length=int(total_sifted),
+                simulation_time_seconds=float(metadata["timing"]["simulation_seconds"]),
+                status=status_info["code"],
+            )
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            status_info = {
+                "code": "POST_PROCESSING_FAILED",
+                "message": f"{type(e).__name__}: {e}",
+                "traceback": tb,
+            }
+            logger.error("Post-processing failed. Traceback:\n%s", tb)
+            return SimulationResults(params=self.p, metadata=metadata, status=status_info["code"], simulation_time_seconds=float(metadata["timing"]["simulation_seconds"]))
+
+    def _validate_and_merge_batch(self, batch_result: dict, overall_stats: dict, expected_pulses: int) -> None:
+        """Helper to validate and merge results from a single batch."""
+        num_pulses = batch_result.get("num_pulses", -1)
+        # The last batch can be smaller than the expected batch size.
+        is_last_batch = (self.p.num_bits % self.p.batch_size != 0) and (num_pulses == self.p.num_bits % self.p.batch_size)
+        if num_pulses != expected_pulses and not is_last_batch:
+            logger.warning(f"Batch returned {num_pulses} pulses, but expected {expected_pulses}.")
+        _merge_batch_tallies(overall_stats, batch_result)
+
