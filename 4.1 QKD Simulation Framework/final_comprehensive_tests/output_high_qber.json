@@ -1,0 +1,113 @@
+{
+  "decoy_estimates": {},
+  "metadata": {
+    "batches_completed": 10,
+    "failures": {},
+    "num_batches": 10,
+    "run_id": "N/A",
+    "schema_version": "1.8",
+    "timing": {
+      "end_monotonic": 43128.852995845,
+      "simulation_seconds": 1.0523704980005277,
+      "start_monotonic": 43127.800625347,
+      "start_utc_iso": "2025-08-27T00:03:00.749435Z"
+    },
+    "version": "v11.0-production-final"
+  },
+  "params": {
+    "allow_unsafe_mdi_approx": false,
+    "assume_phase_equals_bit_error": false,
+    "batch_size": 1000000,
+    "channel": {
+      "_total_loss_db": 2.0,
+      "_transmittance": 0.6309573444801932,
+      "distance_km": 10.0,
+      "fiber_loss_db_km": 0.2
+    },
+    "ci_method": "CLOPPER_PEARSON",
+    "detector": {
+      "_internal_state": {
+        "ap_state_d0": [
+          [
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          0,
+          0
+        ],
+        "ap_state_d1": [
+          [
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          0,
+          0
+        ],
+        "time_since_last_click_ns_d0": null,
+        "time_since_last_click_ns_d1": null
+      },
+      "afterpulse_memory": 5,
+      "afterpulse_prob": 0.01,
+      "dark_rate": 1e-08,
+      "dead_time_ns": 50.0,
+      "det_eff_d0": 0.9,
+      "det_eff_d1": 0.9,
+      "double_click_policy": "DISCARD",
+      "misalignment": 0.005,
+      "misalignment_affects_dark_counts": true,
+      "qber_intrinsic": 0.02,
+      "strict_mode": false
+    },
+    "enforce_monotonicity": true,
+    "eps_cor": 1e-15,
+    "eps_pe": 1e-10,
+    "eps_sec": 1e-09,
+    "eps_smooth": 1e-10,
+    "f_error_correction": 1.16,
+    "force_sequential": false,
+    "lp_solver_method": "highs",
+    "master_seed": null,
+    "num_bits": 10000000,
+    "num_workers": 4,
+    "photon_number_cap": 12,
+    "protocol": "<qkd.protocols.BB84DecoyProtocol object at 0x7f37f4531bb0>",
+    "require_tail_below": 1e-09,
+    "security_proof": "TIGHT_PROOF",
+    "source": {
+      "_mus_cache": [
+        0.5
+      ],
+      "pulse_configs": [
+        {
+          "mean_photon_number": 0.5,
+          "name": "signal",
+          "probability": 1.0
+        }
+      ]
+    }
+  },
+  "raw_sifted_key_length": 1237906,
+  "secure_key_length": 380938,
+  "security_certificate": {
+    "assumed_phase_equals_bit_error": false,
+    "confidence_bound_method": "CLOPPER_PEARSON",
+    "epsilon_allocation": {
+      "eps_cor": 1e-15,
+      "eps_pa": 3.3333300000000005e-10,
+      "eps_pe": 3.3333300000000005e-10,
+      "eps_phase_est": 6.666660000000002e-11,
+      "eps_sec": 1e-09,
+      "eps_smooth": 1.6666650000000003e-10
+    },
+    "lp_solver_diagnostics": null,
+    "proof_name": "TIGHT_PROOF"
+  },
+  "simulation_time_seconds": 1.0523704980005277,
+  "status": "OK"
+}

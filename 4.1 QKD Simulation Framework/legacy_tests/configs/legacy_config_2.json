@@ -1,0 +1,22 @@
+{
+  "protocol_name": "bb84-decoy",
+  "protocol_config": { "alice_z_basis_prob": 0.5, "bob_z_basis_prob": 0.5 },
+  "source_config": {
+    "pulse_configs": [
+      {"name": "signal", "mean_photon_number": 0.5, "probability": 0.7},
+      {"name": "decoy", "mean_photon_number": 0.1, "probability": 0.15},
+      {"name": "vacuum", "mean_photon_number": 0.0, "probability": 0.15}
+    ]
+  },
+  "channel_config": { "distance_km": 20.0, "fiber_loss_db_km": 0.2 },
+  "detector_config": {
+    "det_eff_d0": 0.2, "det_eff_d1": 0.2, "dark_rate": 1e-7,
+    "qber_intrinsic": 0.01, "misalignment": 0.015,
+    "double_click_policy": "DISCARD"
+  },
+  "num_bits": 1000000, "photon_number_cap": 12, "batch_size": 100000,
+  "num_workers": 4, "f_error_correction": 1.1,
+  "eps_sec": 1e-9, "eps_cor": 1e-15, "eps_pe": 1e-10, "eps_smooth": 1e-10,
+  "security_proof": "lim-2014", "ci_method": "clopper-pearson",
+  "enforce_monotonicity": true, "assume_phase_equals_bit_error": false
+}

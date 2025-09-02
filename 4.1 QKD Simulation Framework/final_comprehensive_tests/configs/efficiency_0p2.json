@@ -1,0 +1,44 @@
+{
+  "protocol_name": "bb84-decoy",
+  "protocol_config": {
+    "alice_z_basis_prob": 0.5,
+    "bob_z_basis_prob": 0.5
+  },
+  "source_config": {
+    "pulse_configs": [
+      {
+        "name": "signal",
+        "mean_photon_number": 0.5,
+        "probability": 1.0
+      }
+    ]
+  },
+  "channel_config": {
+    "distance_km": 25,
+    "fiber_loss_db_km": 0.2
+  },
+  "detector_config": {
+    "det_eff_d0": 0.2,
+    "det_eff_d1": 0.2,
+    "dark_rate": 1E-8,
+    "qber_intrinsic": 0.001,
+    "misalignment": 0.005,
+    "afterpulse_prob": 0.01,
+    "afterpulse_memory": 5,
+    "dead_time_ns": 50.0,
+    "double_click_policy": "DISCARD"
+  },
+  "num_bits": 10000000,
+  "photon_number_cap": 12,
+  "batch_size": 1000000,
+  "num_workers": 4,
+  "f_error_correction": 1.16,
+  "eps_sec": 1E-9,
+  "eps_cor": 1E-15,
+  "eps_pe": 1E-10,
+  "eps_smooth": 1E-10,
+  "security_proof": "tight-proof",
+  "ci_method": "clopper-pearson",
+  "enforce_monotonicity": true,
+  "assume_phase_equals_bit_error": false
+}

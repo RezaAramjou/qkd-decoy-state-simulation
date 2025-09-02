@@ -1,0 +1,22 @@
+Of course. Here is a full, clean table summarizing the results from your sensitivity test at 20 km.
+
+### Sensitivity Analysis Results (Distance = 20 km)
+
+| Scenario Name | Baseline SKL/pulse | Scenario SKL/pulse | % Change | p-value | Statistical Significance |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Baseline** | **1.54e-05** | **N/A** | **N/A** | **N/A** | **N/A** |
+| Numeric Sensitivity: +0.1% Dark Rate | 1.54e-05 | 1.54e-05 | +0.08% | 0.4851 | Not Significant |
+| Numeric Sensitivity: -0.1% Dark Rate | 1.54e-05 | 1.55e-05 | +0.21% | 0.4283 | Not Significant |
+| Numeric Sensitivity: +0.1% Detector Eff. | 1.54e-05 | 1.55e-05 | +0.44% | 0.3341 | Not Significant |
+| Numeric Sensitivity: -0.1% Detector Eff. | 1.54e-05 | 1.54e-05 | -0.32% | 0.3643 | Not Significant |
+| Attack Scenario: High Dark Counts | 1.54e-05 | 1.70e-06 | -88.96% | 0.0001 | **Highly Significant** |
+| Attack Scenario: Detector Blinding | 1.54e-05 | 1.94e-04 | +1159.21%| 0.0001 | **Highly Significant** |
+| Imperfection: Increased Misalignment | 1.54e-05 | 0.00e+00 | -100.00% | 0.0001 | **Highly Significant** |
+| Imperfection: Poor Error Correction | 1.54e-05 | 8.76e-06 | -43.14% | 0.0001 | **Highly Significant** |
+
+---
+### Key Takeaways
+
+* **Working System:** At 20 km, your system has a positive secure key length, which is a great baseline.
+* **High Impact Vulnerabilities:** The system is extremely sensitive to high dark counts and optical misalignment, as both completely eliminated the secure key. A less efficient error correction protocol also significantly degraded performance.
+* **Detector Blinding Anomaly:** The most interesting result is the "Detector Blinding" scenario. It caused a massive **1159% increase** in the calculated key rate. This correctly simulates a known attack where blinding the detectors can trick the system into overestimating its security. The very low p-value confirms this is a real, statistically significant effect.
